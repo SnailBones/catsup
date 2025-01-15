@@ -1,0 +1,44 @@
+.answer-card {
+  position: relative;
+  display: inline-block;
+  text-align: center;
+  font-size: 40px;
+  /* justify-content: center; */
+  justify-self: center;
+  align-items: center;
+  /* height: 100px; */
+  /* width: 200px; */
+  padding: 20px;
+  min-width: 200px;
+  border: 8px solid #580097;
+  border-radius: 40px;
+}
+
+.popup {
+  font-size: 14px;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #54b;
+  color: white;
+  padding: 20px;
+  box-shadow: 0 4px 6px #1e1b1b82;
+  z-index: 1000;
+  text-align: center;
+  min-width: 300;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0); /* Start and end at original position */
+  }
+  50% {
+    transform: translateY(-20px); /* Move up by 20px */
+  }
+}
+
+.winner {
+  animation: bounce 0.5s ease-in-out infinite; /* Bounce continuously */
+}

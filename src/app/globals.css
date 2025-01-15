@@ -1,13 +1,14 @@
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  font-size: 20px;
+  --background: #4bccc3;
+  --foreground: #ededed;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+button,
+input {
+  font-size: 20px;
+  font-family: inherit;
+  padding: 10px 20px;
 }
 
 html,
@@ -17,11 +18,16 @@ body {
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  color: #222;
+  /* background: var(--background); */
+  background: #dc82ce;
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1 {
+  font-size: 3rem;
 }
 
 * {
