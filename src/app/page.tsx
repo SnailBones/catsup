@@ -3,9 +3,9 @@
 // import { ChatCompletionOutputMessage } from "@huggingface/tasks";
 import "./page.css";
 import { useEffect, useState, useCallback } from "react";
-import { categories, superlatives } from "./prompts/prompts.json";
-import { promptAI } from "./ai";
-import AnswerCard from "./components/answer-card";
+import { categories, superlatives } from "@/util/prompts.json";
+import { promptAI } from "@/util/ai";
+import AnswerCard from "@/components/answer-card";
 
 type gameState = "choosing" | "judging" | "winner" | "tie";
 
@@ -35,7 +35,6 @@ const players: Player[] = [
   },
 ];
 
-// TODO: consider adding whitespace too?
 const allPunctuation = /[.,\/#!$%\^&\*\"\';:{}=\-_`~()\s]/g;
 
 function cleanResponse(response: string, prompt: string) {
@@ -114,7 +113,7 @@ export default function Home() {
   const pickWinner = useCallback(
     async function () {
       // wait for 1 second before picking a winner
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       if (currentAnswers.length == 0) {
         console.log("No answers");
         setGameState("tie");
@@ -187,9 +186,7 @@ export default function Home() {
     // Use AI to remove responses that don't match category
     for (const answer of answers) {
       const word = answer.answer;
-      console.log("word is", word);
       const prompt = `Would you consider "${word}" a ${category}? Answer "yes" or "no" only.`;
-      console.log("prompt is", prompt);
       const response = await promptAI(prompt); // todo: parallelize
       console.log("response is", response);
       const { answer: aiAnswer } = cleanResponse(response, prompt);
