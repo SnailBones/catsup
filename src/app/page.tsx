@@ -4,7 +4,7 @@
 import "./page.css";
 import { useEffect, useState, useCallback } from "react";
 import { categories, superlatives } from "@/util/prompts.json";
-import { promptAI } from "@/util/ai";
+import { promptAIWithCache as promptAI } from "@/util/ai";
 import AnswerCard from "@/components/answer-card";
 
 type gameState = "choosing" | "judging" | "winner" | "tie";
