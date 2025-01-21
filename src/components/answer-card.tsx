@@ -5,11 +5,13 @@ const AIAnswerCard = ({
   answer,
   explanation,
   color,
+  passes,
   won,
 }: {
   answer: string;
   explanation?: string | null;
   color: string;
+  passes: boolean | null;
   won: boolean;
 }) => {
   const [showingPopup, setShowingPopup] = useState(false);
@@ -21,6 +23,7 @@ const AIAnswerCard = ({
       onMouseEnter={() => setShowingPopup(true)}
       onMouseLeave={() => setShowingPopup(false)}
     >
+      {passes === false && <div className="cancel-x" />}
       <div className="answer-box">{answer}</div>
 
       {showingPopup && explanation && (

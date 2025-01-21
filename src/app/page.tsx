@@ -1,37 +1,60 @@
 /* eslint-disable react/no-unescaped-entities */
 "use client";
-// import { ChatCompletionOutputMessage } from "@huggingface/tasks";
 import "./page.css";
 import { useEffect, useState, useCallback } from "react";
 import { categories, superlatives } from "@/util/prompts.json";
-import { promptAIWithCache as promptAI } from "@/util/ai";
+import { promptAI } from "@/util/ai";
 import AnswerCard from "@/components/answer-card";
+
+const gauntletPrompt = "is #e# an example of a #c#? Answer yes or no.";
 
 type gameState = "choosing" | "judging" | "winner" | "tie";
 
 interface Player {
-  bot: boolean;
+  isBot: boolean;
   name: string;
   color: string;
   score: number;
+}
+
+interface Bot extends Player {
+  isBot: true;
   temperature?: number;
+  prompt: string;
 }
 
 interface Answer {
   answer: string;
   player: Player;
   explanation?: string | null;
-  verified: boolean;
+  passes: boolean | null;
 }
 
-const players: Player[] = [
-  { bot: false, name: "You", color: "rgb(63, 215, 58)", score: 0 },
+const players: (Player | Bot)[] = [
+  { isBot: false, name: "Human", color: "rgb(63, 215, 58)", score: 0 },
+  // competitive bot
   {
-    bot: true,
-    name: "Normal bot (0.2)",
+    isBot: true,
+    name: "🦾🤖",
     color: "rgb(219, 78, 111)",
     score: 0,
-    temperature: 0.2,
+    prompt:
+      // "Provide a one word answer to: what's the #s# #c#? RESPOND WITH ONE WORD ONLY!",
+      // `The #s# #c# is "`, // this one's boring/dumb
+      `Provide a one word answer to: what's the #s# #c#? Answer:"`,
+
+    // temperature: 0.2,
+  },
+  // random bot
+  {
+    isBot: true,
+    name: "🌈😶‍🌫️",
+    color: "rgb(217, 9, 203)",
+    score: 0,
+    prompt:
+      // "Provide a one word answer to: what's a creative example of a #c#? RESPOND WITH ONE WORD ONLY!",
+      `A funny example of a #c# is "`,
+    // temperature: 0.2,
   },
 ];
 
@@ -50,6 +73,19 @@ function cleanResponse(response: string, prompt: string) {
   return { answer, explanation };
 }
 
+function extractQuote(response: string, prompt: string) {
+  // Remove prompt to get just the new characters
+  const generated = response.replace(prompt, "");
+  // const answer = generated.trim().split(/\s+/)[0]; // Extract the first word
+  // Extract the first line
+  const answer = generated.trim().split('"')[0];
+  // Even though we ask it not to, the AI usually continues its response.
+  // Let's share its explanation or ramblings for bonus fun.
+  const explanation = generated.replace(answer, "").trimStart();
+  // if (!/\S/.test(explanation)) explanation = null;
+  return { answer, explanation };
+}
+
 export default function Home() {
   const [gameState, setGameState] = useState<gameState>("choosing");
   // the entries by humans/bots to win the current round
@@ -61,24 +97,28 @@ export default function Home() {
   const [winningAnswers, setWinningAnswers] = useState<Answer[]>([]);
   const [judgeComment, setJudgeComment] = useState("");
 
-  const getAIAnswer = useCallback(async function (cat: string, sup: string) {
-    const bot = players[1];
-    const prompt = `Provide a one word answer to: what's the ${sup} ${cat}? RESPOND WITH ONE WORD ONLY!`;
+  const getAIAnswer = useCallback(async function (
+    bot: Bot,
+    cat: string,
+    sup: string
+  ) {
+    const prompt = bot.prompt.replaceAll("#s#", sup).replaceAll("#c#", cat);
     const response = await promptAI(prompt);
-    console.log("AI's response is:");
+    // console.log("AI's response is:");
     console.log(response);
 
-    const { answer, explanation } = cleanResponse(response, prompt);
+    const { answer, explanation } = extractQuote(response, prompt);
     setCurrentAnswers((prev) => [
       ...prev,
       {
         answer,
         player: bot,
         explanation,
-        verified: false,
+        passes: null,
       },
     ]);
-  }, []);
+  },
+  []);
 
   const newPrompt = useCallback(
     async function () {
@@ -91,7 +131,11 @@ export default function Home() {
       setCurrentAnswers([]);
       setGameState("choosing");
       setJudgeComment("");
-      getAIAnswer(category, superlative);
+      for (const player of players) {
+        if (player.isBot) {
+          await getAIAnswer(player as Bot, category, superlative);
+        }
+      }
     },
     [getAIAnswer]
   );
@@ -105,36 +149,91 @@ export default function Home() {
     const currentPlayer = players[0];
     setCurrentAnswers((prev) => [
       ...prev,
-      { answer, player: currentPlayer, explanation: null, verified: false },
+      { answer, player: currentPlayer, explanation: null, passes: null },
     ]);
     setInputText("");
   };
 
+  // extra credit: pass through one more bot to double check that they're not the same thing
+  const runGauntlet = useCallback(async () => {
+    setGameState("judging");
+    let answers = [...currentAnswers];
+    const strings = answers.map((a) => a.answer);
+    // Remove duplicates
+    const standardStrings = strings.map((s) =>
+      s.replace(allPunctuation, "").toLowerCase()
+    );
+    for (let i = 0; i < answers.length - 1; i++) {
+      const duplicates = [i];
+      for (let j = i + 1; j < answers.length; j++) {
+        if (standardStrings[i] === standardStrings[j]) {
+          duplicates.push(j);
+        }
+      }
+      if (duplicates.length > 1) {
+        answers = answers.map((a, i) =>
+          duplicates.includes(i) ? { ...a, passes: false } : a
+        );
+        setCurrentAnswers(answers);
+        console.log("eliminated duplicates", duplicates);
+        setJudgeComment("Duplicates eliminated!");
+      }
+    }
+
+    // Use AI to remove responses that don't match category
+    for (const answer of answers) {
+      if (answer.passes === false) continue;
+      const word = answer.answer;
+      const prompt = gauntletPrompt
+        .replaceAll("#e#", word)
+        .replaceAll("#c#", category);
+      const response = await promptAI(prompt); // todo: parallelize
+      console.log("response is", response);
+      const { answer: aiAnswer } = cleanResponse(response, prompt);
+      if (aiAnswer.toLowerCase().includes("no")) {
+        // console.log(`${word} is not a ${category}`);
+        // answers = answers.filter((a) => a !== answer);
+        // setCurrentAnswers((a) => a.filter((a) => a !== answer));
+        setCurrentAnswers((a) =>
+          a.map((a) => (a === answer ? { ...a, passes: false } : a))
+        );
+        console.log("eliminated", word, "not a", category);
+        setJudgeComment(`${word} is not a ${category}`);
+      } else {
+        setCurrentAnswers((a) =>
+          a.map((a) => (a === answer ? { ...a, passes: true } : a))
+        );
+      }
+    }
+  }, [currentAnswers, category]);
+
   const pickWinner = useCallback(
     async function () {
+      const validAnswers = currentAnswers.filter((a) => a.passes);
       // wait for 1 second before picking a winner
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      if (currentAnswers.length == 0) {
-        console.log("No answers");
+      // await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (validAnswers.length == 0) {
+        // console.log("No answers");
         setGameState("tie");
+        setJudgeComment("You all lose!");
         return;
-      } else if (currentAnswers.length == 1) {
-        console.log("Only one answer. Wins by default");
-        setWinningAnswers((w) => [...w, currentAnswers[0]]);
+      } else if (validAnswers.length == 1) {
+        // console.log("Only one answer. Wins by default");
+        setWinningAnswers((w) => [...w, validAnswers[0]]);
         setGameState("winner");
-        setJudgeComment(`${currentAnswers[0].player.name} wins by default!`);
+        setJudgeComment(`${validAnswers[0].player.name} wins by default!`);
         return;
       }
 
-      const entries = currentAnswers.map((a) => a.answer).reverse(); // todo: random order
+      const entries = validAnswers.map((a) => a.answer); // todo: random order
       const prompt = `Which is the ${superlative} of the following? [${entries.join(
         ", "
       )}]? Respond with one entry from the list, nothing more!`;
-      console.log("pickwinner prompt is:");
-      console.log(prompt);
+      // console.log("pickwinner prompt is:");
+      // console.log(prompt);
 
       const response = await promptAI(prompt);
-      console.log("pickwinner response is:");
+      // console.log("pickwinner response is:");
       console.log(response);
 
       setGameState("winner");
@@ -143,18 +242,24 @@ export default function Home() {
       setJudgeComment(explanation);
 
       const winningAnswer =
-        currentAnswers.find((a) => a.answer === answer) ||
-        currentAnswers.find((a) => answer.includes(a.answer)) ||
-        currentAnswers.find((a) => a.answer.includes(answer)) ||
-        currentAnswers.find(
+        validAnswers.find((a) => a.answer === answer) ||
+        validAnswers.find((a) => answer.includes(a.answer)) ||
+        validAnswers.find((a) => a.answer.includes(answer)) ||
+        validAnswers.find(
           (a) =>
             a.answer.replace(allPunctuation, "").toLowerCase() ===
             answer.replace(allPunctuation, "").toLowerCase()
+        ) ||
+        validAnswers.find((a) =>
+          answer
+            .replace(allPunctuation, "")
+            .toLowerCase()
+            .includes(a.answer.replace(allPunctuation, "").toLowerCase())
         );
 
       if (!winningAnswer) {
         // if the AI fucks up
-        console.log("It's a tie!");
+        // console.log("I can't decide. It's a tie!");
         setGameState("tie");
         return;
       }
@@ -164,57 +269,17 @@ export default function Home() {
     [currentAnswers, superlative]
   );
 
-  // extra credit: pass through one more bot to double check that they're not the same thing
-  const judgeAnswers = useCallback(async () => {
-    setGameState("judging");
-    let answers = [...currentAnswers];
-    const strings = answers.map((a) => a.answer);
-    // Remove duplicates
-    if (
-      strings[0].replace(allPunctuation, "").toLowerCase() ===
-      strings[1].replace(allPunctuation, "").toLowerCase()
-    ) {
-      const duplicates = [answers[0], answers[1]];
-      answers = answers.filter((a) => !duplicates.includes(a));
-      setCurrentAnswers(answers);
-      setJudgeComment("Duplicates eliminated!");
-      if (answers.length === 0) {
-        setGameState("tie");
-        return;
-      }
-    }
-    // Use AI to remove responses that don't match category
-    for (const answer of answers) {
-      const word = answer.answer;
-      const prompt = `Would you consider "${word}" a ${category}? Answer "yes" or "no" only.`;
-      const response = await promptAI(prompt); // todo: parallelize
-      console.log("response is", response);
-      const { answer: aiAnswer } = cleanResponse(response, prompt);
-      if (aiAnswer.toLowerCase().includes("no")) {
-        console.log(`${word} is not a ${category}`);
-        // answers = answers.filter((a) => a !== answer);
-        setCurrentAnswers((a) => a.filter((a) => a !== answer));
-        setJudgeComment(`${word} is not a ${category}`);
-      } else {
-        setCurrentAnswers((a) =>
-          a.map((a) => (a === answer ? { ...a, verified: true } : a))
-        );
-        console.log(`${word} is a ${category}`);
-      }
-    }
-  }, [currentAnswers, category]);
-
   useEffect(() => {
     if (gameState === "choosing" && currentAnswers.length >= players.length) {
-      judgeAnswers();
+      runGauntlet();
     }
     if (
       gameState === "judging" &&
-      currentAnswers.reduce((a, b) => a && b.verified, true)
+      currentAnswers.reduce((a, b) => a && b.passes !== null, true)
     ) {
       pickWinner();
     }
-  }, [gameState, currentAnswers, judgeAnswers, pickWinner]);
+  }, [gameState, currentAnswers, runGauntlet, pickWinner]);
 
   const winningAnswer = winningAnswers[winningAnswers.length - 1];
   const scores = players.map((p) => {
@@ -245,10 +310,11 @@ export default function Home() {
             <AnswerCard
               key={a.player.name}
               answer={
-                gameState !== "choosing" || !a.player.bot ? a.answer : "***"
+                gameState !== "choosing" || !a.player.isBot ? a.answer : "***"
               }
               explanation={a.explanation}
               color={a.player.color}
+              passes={a.passes}
               won={
                 gameState === "winner" &&
                 winningAnswer &&
@@ -275,22 +341,15 @@ export default function Home() {
                 submit
               </button>
             </form>
-            {/* <button
-              onClick={getAIAnswer}
-              disabled={currentAnswers.some((a) => a.player === "bot")}
-              className={"button}
-            >
-              Get AI Answer!
-            </button> */}
-            <button
-              disabled={currentAnswers.length < 2}
-              onClick={pickWinner}
-              className={"button"}
-            >
-              Judge answers!
-            </button>
           </>
         )}
+        {/* <button
+          disabled={currentAnswers.length < 2}
+          onClick={pickWinner}
+          className={"button"}
+        >
+          Judge answers!
+        </button> */}
         <button onClick={newPrompt} className={"button"}>
           New prompt!
         </button>

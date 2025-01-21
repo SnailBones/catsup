@@ -2,8 +2,15 @@
 "use client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
-import { categories, superlatives } from "@/util/prompts.json";
 import { promptAIWithCache } from "@/util/ai";
+import {
+  JudgeTest,
+  judgeTestCases,
+  judgeTemplates,
+  GauntletTest,
+  gauntletTestCases,
+  gauntletTemplates,
+} from "@/util/tests";
 
 const styles = {
   list: {
@@ -43,26 +50,30 @@ const styles = {
   },
 };
 
-interface JudgeTest {
-  superlative: string;
-  entries: string[];
-  winner: string;
-}
-
-interface TestRun {
-  superlative: string;
-  entries: string[];
-  winner: string;
+interface JudgeTestRun extends JudgeTest {
   prompt: string;
   result: string;
   fullResponse: string;
   passed: boolean;
 }
 
-interface templateRun {
+interface judgeTemplateRun {
   template: string;
   score: number;
-  tests: TestRun[];
+  tests: JudgeTestRun[];
+}
+
+interface GauntletTestRun extends GauntletTest {
+  prompt: string;
+  result: string;
+  fullResponse: string;
+  passed: boolean;
+}
+
+interface GauntletTemplateRun {
+  template: string;
+  score: number;
+  tests: GauntletTestRun[];
 }
 
 const allPunctuation = /[.,\/#!$%\^&\*\"\';:{}=\-_`~()\s]/g;
@@ -80,92 +91,31 @@ function cleanResponse(response: string, prompt: string) {
   return { answer, explanation };
 }
 
-const testCases: JudgeTest[] = [
-  { superlative: "bounciest", entries: ["Flea", "Termite"], winner: "Flea" },
-  {
-    superlative: "most addictive",
-    entries: ["Methane", "Laughing gas"],
-    winner: "Laughing gas",
-  },
-  {
-    superlative: "most addictive",
-    entries: ["Laughing gas", "Methane"],
-    winner: "Laughing gas",
-  },
-  {
-    superlative: "most adorable",
-    entries: ["Unicorn", "Tiny elephants"],
-    winner: "Tiny elephants",
-  },
-  {
-    superlative: "youngest",
-    entries: ["Zero", "Emojis"],
-    winner: "Emojis",
-  },
-  {
-    superlative: "most conspiratorial",
-    entries: ["Xenophobia.", "X-files"],
-    winner: "X-files",
-  },
-  {
-    superlative: "cloudiest",
-    entries: ["cat", "sheep"],
-    winner: "sheep",
-  },
-  {
-    superlative: "dantiest",
-    entries: ["lace", "fairy tea party"],
-    winner: "fairy tea party",
-  },
-  {
-    superlative: "most confusing",
-    entries: ["tangled wires", "lightbulb"],
-    winner: "tangled wires",
-  },
-  {
-    superlative: "most sensitive",
-    entries: ["Blush.", "Chameleon"],
-    winner: "Blush.",
-  },
-  {
-    superlative: "strangest",
-    entries: ["Rorschach", "Rubberband"],
-    winner: "Roschach",
-  },
-];
-const templates = [
-  // "Which is the #s# of the following? [#e#]? Respond with one entry from the list, nothing more!", score 3
-  // "Which of the following is the #s#? [#e#]? Respond with one entry from the list, nothing more!", // score 4
-  "Which of the following is the #s#? [#e#]? Please think carefully and respond with one entry from the list, nothing more!", // score 6
-  "Which is the #s#? of the following:[#e#]? Please think carefully and respond with one entry from the list, nothing more!", // score 6
-
-  // "Consider this list: [#e#]. Which of the listed items is the #s#?", // score 3
-  // "Consider this list: [#e#]. Which of the listed items is the #s#? Please think carefully and respond with one entry from the list, nothing more!", // score 3
-];
-
 type OpenItems = Record<string, boolean>;
 
 export default function Home() {
   const [openItems, setOpenItems] = useState<OpenItems>({});
-  const [results, setResults] = useState<templateRun[]>([]);
+  const [judgeTestResults, setJudgeTestResults] = useState<judgeTemplateRun[]>(
+    []
+  );
+  const [gauntletTestResults, setGauntletTestResults] = useState<
+    GauntletTemplateRun[]
+  >([]);
 
   const testJudgeAI = useCallback(async function (
     testCase: JudgeTest,
     promptTemplate: string
-  ): Promise<TestRun> {
+  ): Promise<JudgeTestRun> {
     ("");
 
     const entries = testCase.entries.join(", ");
     const prompt = promptTemplate
       .replaceAll("#s#", testCase.superlative)
       .replace("#e#", entries);
-    console.log("prompt is:");
-    console.log(prompt);
     const response = await promptAIWithCache(prompt);
-    console.log("response is:");
-    console.log(response);
-
     const { answer, explanation } = cleanResponse(response, prompt);
+    console.log("answer is:");
+    console.log(answer);
 
     const winningAnswer =
       testCase.entries.find((a) => a === answer) ||
@@ -175,6 +125,12 @@ export default function Home() {
         (a) =>
           a.replace(allPunctuation, "").toLowerCase() ===
           answer.replace(allPunctuation, "").toLowerCase()
+      ) ||
+      testCase.entries.find((e) =>
+        answer
+          .replace(allPunctuation, "")
+          .toLowerCase()
+          .includes(e.replace(allPunctuation, "").toLowerCase())
       );
 
     const result = winningAnswer ? winningAnswer : "tie";
@@ -191,10 +147,10 @@ export default function Home() {
   },
   []);
 
-  const testTemplate = useCallback(
+  const testJudgeTemplate = useCallback(
     async function (template: string) {
       const tests = [];
-      for (const testCase of testCases) {
+      for (const testCase of judgeTestCases) {
         const result = await testJudgeAI(testCase, template);
         tests.push(result);
       }
@@ -203,15 +159,70 @@ export default function Home() {
     [testJudgeAI]
   );
 
-  const testAll = useCallback(
+  const runJudgeTests = useCallback(
     async function () {
-      setResults([]);
-      for (const template of templates) {
-        const result = await testTemplate(template);
-        setResults((prev) => [...prev, result]);
+      setJudgeTestResults([]);
+      for (const template of judgeTemplates) {
+        const result = await testJudgeTemplate(template);
+        setJudgeTestResults((prev) => [...prev, result]);
       }
     },
-    [testTemplate]
+    [testJudgeTemplate]
+  );
+
+  const testGauntlet = useCallback(async function (
+    testCase: GauntletTest,
+    promptTemplate: string
+  ): Promise<GauntletTestRun> {
+    ("");
+    const prompt = promptTemplate
+      .replaceAll("#c#", testCase.category)
+      .replaceAll("#e#", testCase.entry);
+
+    console.log("prompt is:");
+    console.log(prompt);
+    const response = await promptAIWithCache(prompt);
+    console.log("response is:");
+    console.log(response);
+
+    const { answer, explanation } = cleanResponse(response, prompt);
+
+    const passed = testCase.shouldPass
+      ? answer.toLowerCase().includes("yes")
+      : answer.toLowerCase().includes("no");
+
+    return {
+      ...testCase,
+      prompt,
+      passed,
+      result: answer,
+      fullResponse: response,
+    };
+  },
+  []);
+
+  const testGauntletTemplate = useCallback(
+    async function (template: string) {
+      const testPromises = gauntletTestCases.map((testCase) =>
+        testGauntlet(testCase, template)
+      );
+
+      // Wait for all tests to complete
+      const tests = await Promise.all(testPromises);
+      return { template, score: tests.filter((t) => t.passed).length, tests };
+    },
+    [testGauntlet]
+  );
+
+  const runGauntletTests = useCallback(
+    async function () {
+      setGauntletTestResults([]);
+      for (const template of gauntletTemplates) {
+        const result = await testGauntletTemplate(template);
+        setGauntletTestResults((prev) => [...prev, result]);
+      }
+    },
+    [testGauntletTemplate]
   );
 
   const toggleItem = (id: string) => {
@@ -224,7 +235,7 @@ export default function Home() {
   return (
     <div className={"page"}>
       <main className={"main"}>
-        <h1 className={"title"}>Prompt test</h1>
+        <h1 className={"title"}>Testing final judge</h1>
         <div style={styles.header} onClick={() => toggleItem(`template-list`)}>
           <span style={styles.iconWrapper}>
             {openItems[`template-list`] ? (
@@ -237,7 +248,7 @@ export default function Home() {
         </div>
         {openItems[`template-list`] && (
           <ul style={{ ...styles.list, ...styles.content }}>
-            {templates.map((template, i) => (
+            {judgeTemplates.map((template, i) => (
               <li key={template}>{template}</li>
             ))}
           </ul>
@@ -254,7 +265,7 @@ export default function Home() {
         </div>
         {openItems[`test-case-list`] && (
           <ul style={{ ...styles.list, ...styles.content }}>
-            {testCases.map((testCase, i) => (
+            {judgeTestCases.map((testCase, i) => (
               <li key={i}>
                 {testCase.superlative} [{testCase.entries.join(", ")}] Winner
                 should be: {testCase.winner}
@@ -262,12 +273,12 @@ export default function Home() {
             ))}
           </ul>
         )}
-        <button className={"button"} onClick={testAll}>
-          Test All
+        <button className={"button"} onClick={runJudgeTests}>
+          Test the judge
         </button>
         <h2>Results:</h2>
         <ul style={styles.list}>
-          {results.map((templateRun, i) => (
+          {judgeTestResults.map((judgeTemplateRun, i) => (
             <li key={i} style={styles.listItem}>
               <div
                 style={styles.header}
@@ -281,14 +292,14 @@ export default function Home() {
                   )}
                 </span>
                 <div>
-                  <div>Score: {templateRun.score}</div>
-                  <div>Template: {templateRun.template}</div>
+                  <div>Score: {judgeTemplateRun.score}</div>
+                  <div>Template: {judgeTemplateRun.template}</div>
                 </div>
               </div>
 
               {openItems[`template-${i}`] && (
                 <ul style={styles.list}>
-                  {templateRun.tests.map((test, j) => (
+                  {judgeTemplateRun.tests.map((test, j) => (
                     <li key={j} style={styles.nestedItem}>
                       <div
                         style={styles.header}
@@ -315,6 +326,120 @@ export default function Home() {
                       </div>
 
                       {openItems[`test-${i}-${j}`] && (
+                        <ul style={{ ...styles.list, ...styles.content }}>
+                          <li>Prompt: {test.prompt}</li>
+                          <li>Result: {test.result}</li>
+                          {/* <li>Response: {test.}</li> */}
+                          <li>
+                            {/* Full response:{" "} */}
+                            {test.fullResponse.replace(test.prompt, "")}
+                          </li>
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+        <h1 className={"title"}>Gauntlet test</h1>
+        <div
+          style={styles.header}
+          onClick={() => toggleItem(`template-list-g`)}
+        >
+          <span style={styles.iconWrapper}>
+            {openItems[`template-list-g`] ? (
+              <ChevronDown size={16} />
+            ) : (
+              <ChevronRight size={16} />
+            )}
+          </span>
+          <div>Templates:</div>
+        </div>
+        {openItems[`template-list-g`] && (
+          <ul style={{ ...styles.list, ...styles.content }}>
+            {gauntletTemplates.map((template, i) => (
+              <li key={template}>{template}</li>
+            ))}
+          </ul>
+        )}
+        <div
+          style={styles.header}
+          onClick={() => toggleItem(`test-case-list-g`)}
+        >
+          <span style={styles.iconWrapper}>
+            {openItems[`test-case-list-g`] ? (
+              <ChevronDown size={16} />
+            ) : (
+              <ChevronRight size={16} />
+            )}
+          </span>
+          <div>Test cases:</div>
+        </div>
+        {openItems[`test-case-list-g`] && (
+          <ul style={{ ...styles.list, ...styles.content }}>
+            {gauntletTestCases.map((testCase, i) => (
+              <li key={i}>
+                {testCase.category} [{testCase.entry}] Should pass?{" "}
+                {testCase.shouldPass}
+              </li>
+            ))}
+          </ul>
+        )}
+        <button className={"button"} onClick={runGauntletTests}>
+          Test the gauntlet
+        </button>
+        <h2>Results:</h2>
+        <ul style={styles.list}>
+          {gauntletTestResults.map((gauntletTemplateRun, i) => (
+            <li key={i} style={styles.listItem}>
+              <div
+                style={styles.header}
+                onClick={() => toggleItem(`template-g-${i}`)}
+              >
+                <span style={styles.iconWrapper}>
+                  {openItems[`template-g-${i}`] ? (
+                    <ChevronDown size={16} />
+                  ) : (
+                    <ChevronRight size={16} />
+                  )}
+                </span>
+                <div>
+                  <div>Score: {gauntletTemplateRun.score}</div>
+                  <div>Template: {gauntletTemplateRun.template}</div>
+                </div>
+              </div>
+
+              {openItems[`template-g-${i}`] && (
+                <ul style={styles.list}>
+                  {gauntletTemplateRun.tests.map((test, j) => (
+                    <li key={j} style={styles.nestedItem}>
+                      <div
+                        style={styles.header}
+                        onClick={() => toggleItem(`test-g-${i}-${j}`)}
+                      >
+                        <span style={styles.iconWrapper}>
+                          {openItems[`test-g-${i}-${j}`] ? (
+                            <ChevronDown size={16} />
+                          ) : (
+                            <ChevronRight size={16} />
+                          )}
+                        </span>
+                        <div
+                          style={
+                            test.passed
+                              ? styles.passed
+                              : test.result === "tie"
+                              ? styles.tie
+                              : styles.failed
+                          }
+                        >
+                          Test {j + 1}
+                        </div>
+                      </div>
+
+                      {openItems[`test-g-${i}-${j}`] && (
                         <ul style={{ ...styles.list, ...styles.content }}>
                           <li>Prompt: {test.prompt}</li>
                           <li>Result: {test.result}</li>
