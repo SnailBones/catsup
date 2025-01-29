@@ -4,11 +4,11 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 
-const API_URL =
-  //   "https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-hf"; // im banned :(
-  // "https://api-inference.huggingface.co/models/google/gemma-2b-it"; // dumb
-  "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"; // good but nemo might be even better
-// "https://api-inference.huggingface.co/models/mistralai/Mistral-Nemo-Instruct-2407"; // really good on the playground but awful or CURL... I think they might have the wrong API connected to the playground
+// const API_URL =
+//   "https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-hf"; // im banned :(
+// "https://api-inference.huggingface.co/models/google/gemma-2b-it"; // dumb
+// "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"; // good but nemo might be even better
+// "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B";
 
 const MAX_TOKENS = 16;
 const TEMPERATURE = 0.2;
@@ -95,6 +95,7 @@ class HuggingFaceCache {
 
 async function promptAI(
   input: string,
+  model: string = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
   temperature: number = TEMPERATURE
 ): Promise<string> {
   const body = JSON.stringify({
@@ -110,14 +111,17 @@ async function promptAI(
     throw new Error("Missing Hugging Face API key");
   }
   try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.HUGGING_FACE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body,
-    });
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/" + model,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.HUGGING_FACE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body,
+      }
+    );
 
     if (!response.ok) {
       console.error("API Error:", response);

@@ -6,7 +6,7 @@ import { categories, superlatives } from "@/util/prompts.json";
 import { promptAI } from "@/util/ai";
 import AnswerCard from "@/components/answer-card";
 
-const gauntletPrompt = "is #e# an example of a #c#? Answer yes or no.";
+const gauntletPrompt = `is "#e#"" an example of a #c#? Answer yes or no.`;
 
 type gameState = "choosing" | "judging" | "winner" | "tie";
 
@@ -19,8 +19,9 @@ interface Player {
 
 interface Bot extends Player {
   isBot: true;
-  temperature?: number;
   prompt: string;
+  temperature?: number;
+  model?: string;
 }
 
 interface Answer {
@@ -35,8 +36,9 @@ const players: (Player | Bot)[] = [
   // competitive bot
   {
     isBot: true,
-    name: "🦾🤖",
-    color: "rgb(219, 78, 111)",
+    name: "Mistral 🇫🇷🤖🗼",
+    model: "mistralai/Mistral-7B-Instruct-v0.3",
+    color: "rgb(87, 78, 219)",
     score: 0,
     prompt:
       // "Provide a one word answer to: what's the #s# #c#? RESPOND WITH ONE WORD ONLY!",
@@ -45,17 +47,27 @@ const players: (Player | Bot)[] = [
 
     // temperature: 0.2,
   },
-  // random bot
   {
     isBot: true,
-    name: "🌈😶‍🌫️",
-    color: "rgb(217, 9, 203)",
+    name: "Deepseek 🇨🇳🤖⛩️",
+    model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+    color: "rgb(191, 0, 0)",
     score: 0,
-    prompt:
-      // "Provide a one word answer to: what's a creative example of a #c#? RESPOND WITH ONE WORD ONLY!",
-      `A funny example of a #c# is "`,
+    prompt: `Provide a one word answer to: what's the #s# #c#? Answer:"`,
+
     // temperature: 0.2,
   },
+  // random bot
+  // {
+  //   isBot: true,
+  //   name: "🌈😶‍🌫️",
+  //   color: "rgb(217, 9, 203)",
+  //   score: 0,
+  //   prompt:
+  //     // "Provide a one word answer to: what's a creative example of a #c#? RESPOND WITH ONE WORD ONLY!",
+  //     `A funny example of a #c# is "`,
+  //   // temperature: 0.2,
+  // },
 ];
 
 const allPunctuation = /[.,\/#!$%\^&\*\"\';:{}=\-_`~()\s]/g;
@@ -103,11 +115,12 @@ export default function Home() {
     sup: string
   ) {
     const prompt = bot.prompt.replaceAll("#s#", sup).replaceAll("#c#", cat);
-    const response = await promptAI(prompt);
-    // console.log("AI's response is:");
+    const response = await promptAI(prompt, bot.model);
+    console.log(bot.name + " says:");
     console.log(response);
 
     const { answer, explanation } = extractQuote(response, prompt);
+    return { answer, explanation };
     setCurrentAnswers((prev) => [
       ...prev,
       {
@@ -133,7 +146,20 @@ export default function Home() {
       setJudgeComment("");
       for (const player of players) {
         if (player.isBot) {
-          await getAIAnswer(player as Bot, category, superlative);
+          const { answer, explanation } = await getAIAnswer(
+            player as Bot,
+            category,
+            superlative
+          );
+          setCurrentAnswers((prev) => [
+            ...prev,
+            {
+              answer,
+              player,
+              explanation,
+              passes: null,
+            },
+          ]);
         }
       }
     },
@@ -188,7 +214,8 @@ export default function Home() {
         .replaceAll("#e#", word)
         .replaceAll("#c#", category);
       const response = await promptAI(prompt); // todo: parallelize
-      console.log("response is", response);
+      console.log("judge (deepseek) says:");
+      console.log(response);
       const { answer: aiAnswer } = cleanResponse(response, prompt);
       if (aiAnswer.toLowerCase().includes("no")) {
         // console.log(`${word} is not a ${category}`);
@@ -325,7 +352,8 @@ export default function Home() {
         </div>
         {gameState === "choosing" && (
           <>
-            <form
+            <form // "Provide a one word answer to: what's the #s# #c#? RESPOND WITH ONE WORD ONLY!",
+              // `The #s# #c# is "`, // this one's boring/dumb
               className={"inputForm"}
               onSubmit={(e) => {
                 e.preventDefault();
@@ -335,7 +363,8 @@ export default function Home() {
               <input
                 type="text"
                 onChange={(e) => setInputText(e.target.value)}
-                value={inputText}
+                value={inputText} // "Provide a one word answer to: what's the #s# #c#? RESPOND WITH ONE WORD ONLY!",
+                // `The #s# #c# is "`, // this one's boring/dumb
               />
               <button type="submit" className={"button"}>
                 submit
@@ -355,7 +384,9 @@ export default function Home() {
         </button>
       </main>
       <footer className={"footer"}>
-        {scores.map((p) => ` ${p.player}: ${p.score}`)}
+        {scores.map((p) => (
+          <div key={p.player}>{`${p.player}: ${p.score}`}</div>
+        ))}
       </footer>
     </div>
   );

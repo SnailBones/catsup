@@ -124,7 +124,7 @@ export default function Home() {
       testCase.entries.find(
         (a) =>
           a.replace(allPunctuation, "").toLowerCase() ===
-          answer.replace(allPunctuation, "").toLowerCase()
+          answer.replace(allPunctuation, "").to LMStudioLowerCase()
       ) ||
       testCase.entries.find((e) =>
         answer
@@ -261,7 +261,7 @@ export default function Home() {
               <ChevronRight size={16} />
             )}
           </span>
-          <div>Test cases:</div>
+          <div>Test cases:</div>🇨🇳
         </div>
         {openItems[`test-case-list`] && (
           <ul style={{ ...styles.list, ...styles.content }}>
