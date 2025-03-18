@@ -6,7 +6,7 @@ import { categories, superlatives } from "@/util/prompts.json";
 import { promptAI } from "@/util/ai";
 import AnswerCard from "@/components/answer-card";
 
-const gauntletPrompt = `is "#e#"" an example of a #c#? Answer yes or no.`;
+const gauntletPrompt = `is "#e#" an example of a #c#? Answer yes or no.`;
 
 type gameState = "choosing" | "judging" | "winner" | "tie";
 
@@ -36,7 +36,7 @@ const players: (Player | Bot)[] = [
   // competitive bot
   {
     isBot: true,
-    name: "Mistral 🇫🇷🤖🗼",
+    name: " 🇫🇷🤖🗼 Mistral",
     model: "mistralai/Mistral-7B-Instruct-v0.3",
     color: "rgb(87, 78, 219)",
     score: 0,
@@ -47,27 +47,36 @@ const players: (Player | Bot)[] = [
 
     // temperature: 0.2,
   },
-  {
-    isBot: true,
-    name: "Deepseek 🇨🇳🤖⛩️",
-    model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-    color: "rgb(191, 0, 0)",
-    score: 0,
-    prompt: `Provide a one word answer to: what's the #s# #c#? Answer:"`,
-
-    // temperature: 0.2,
-  },
-  // random bot
+  // TODO: Deepseek v3 needs another inference provider.
   // {
   //   isBot: true,
-  //   name: "🌈😶‍🌫️",
-  //   color: "rgb(217, 9, 203)",
+  //   name: "Deepseek 🇨🇳🤖⛩️",
+  //   model: "deepseek-ai/DeepSeek-V3",
+  //   color: "rgb(191, 0, 0)",
   //   score: 0,
-  //   prompt:
-  //     // "Provide a one word answer to: what's a creative example of a #c#? RESPOND WITH ONE WORD ONLY!",
-  //     `A funny example of a #c# is "`,
+  //   prompt: `Provide a one word answer to: what's the #s# #c#? Answer:"`,
+
   //   // temperature: 0.2,
   // },
+  {
+    isBot: true,
+    name: "🇺🇸🦙 Llama",
+    model: "meta-llama/Llama-3.2-3B-Instruct",
+    color: "rgb(9, 144, 217)",
+    score: 0,
+    prompt: `Provide a one word answer to: what's the #s# #c#? Answer:"`,
+  },
+  // random bot
+  {
+    isBot: true,
+    name: " 🌈😶‍🌫️🦙 Silly Llama",
+    color: "rgb(217, 9, 203)",
+    score: 0,
+    prompt:
+      // "Provide a one word answer to: what's a creative example of a #c#? RESPOND WITH ONE WORD ONLY!",
+      `A funny example of a #c# is "`,
+    // temperature: 0.2,
+  },
 ];
 
 const allPunctuation = /[.,\/#!$%\^&\*\"\';:{}=\-_`~()\s]/g;
@@ -118,18 +127,9 @@ export default function Home() {
     const response = await promptAI(prompt, bot.model);
     console.log(bot.name + " says:");
     console.log(response);
-
+    if (!response) return { answer: null, explanation: null };
     const { answer, explanation } = extractQuote(response, prompt);
     return { answer, explanation };
-    setCurrentAnswers((prev) => [
-      ...prev,
-      {
-        answer,
-        player: bot,
-        explanation,
-        passes: null,
-      },
-    ]);
   },
   []);
 
@@ -151,6 +151,7 @@ export default function Home() {
             category,
             superlative
           );
+          if (!answer) continue;
           setCurrentAnswers((prev) => [
             ...prev,
             {
@@ -214,7 +215,7 @@ export default function Home() {
         .replaceAll("#e#", word)
         .replaceAll("#c#", category);
       const response = await promptAI(prompt); // todo: parallelize
-      console.log("judge (deepseek) says:");
+      console.log("judge says:");
       console.log(response);
       const { answer: aiAnswer } = cleanResponse(response, prompt);
       if (aiAnswer.toLowerCase().includes("no")) {

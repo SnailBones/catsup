@@ -4,11 +4,6 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 
-// const API_URL =
-//   "https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-hf"; // im banned :(
-// "https://api-inference.huggingface.co/models/google/gemma-2b-it"; // dumb
-// "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"; // good but nemo might be even better
-// "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B";
 
 const MAX_TOKENS = 16;
 const TEMPERATURE = 0.2;
@@ -95,7 +90,7 @@ class HuggingFaceCache {
 
 async function promptAI(
   input: string,
-  model: string = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+  model: string = "mistralai/Mistral-7B-Instruct-v0.3",
   temperature: number = TEMPERATURE
 ): Promise<string> {
   const body = JSON.stringify({
@@ -124,19 +119,22 @@ async function promptAI(
     );
 
     if (!response.ok) {
-      console.error("API Error:", response);
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      // console.error("API Error:", response);
+      console.error("API Error:", response.status, response.statusText);
+      // throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     return data[0].generated_text;
   } catch (error) {
     console.error("Error while fetching text generation:", error);
-    throw error;
+    return "";
+    // throw error;
   }
 }
 
 async function promptAIWithCache(
+  model: string = "mistralai/Mistral-7B-Instruct-v0.3",
   inputs: string,
   temperature: number = TEMPERATURE
 ): Promise<string> {
@@ -159,14 +157,17 @@ async function promptAIWithCache(
     throw new Error("Missing Hugging Face API key");
   }
   try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.HUGGING_FACE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ inputs, parameters }),
-    });
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/" + model,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.HUGGING_FACE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ inputs, parameters }),
+      }
+    );
 
     if (!response.ok) {
       console.error("API Error:", response);
