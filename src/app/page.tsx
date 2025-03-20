@@ -218,7 +218,7 @@ export default function Home() {
       console.log("judge says:");
       console.log(response);
       const { answer: aiAnswer } = cleanResponse(response, prompt);
-      if (aiAnswer.toLowerCase().includes("no")) {
+      if (aiAnswer.toLowerCase().startsWith("no")) {
         // console.log(`${word} is not a ${category}`);
         // answers = answers.filter((a) => a !== answer);
         // setCurrentAnswers((a) => a.filter((a) => a !== answer));

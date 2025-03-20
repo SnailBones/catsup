@@ -128,7 +128,7 @@ async function promptAI(
     return data[0].generated_text;
   } catch (error) {
     console.error("Error while fetching text generation:", error);
-    return "";
+    return "Error while fetching text generation: " + error;
     // throw error;
   }
 }
