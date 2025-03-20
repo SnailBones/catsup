@@ -124,7 +124,7 @@ export default function Home() {
       testCase.entries.find(
         (a) =>
           a.replace(allPunctuation, "").toLowerCase() ===
-          answer.replace(allPunctuation, "").to LMStudioLowerCase()
+          answer.replace(allPunctuation, "").toLowerCase()
       ) ||
       testCase.entries.find((e) =>
         answer
@@ -188,8 +188,8 @@ export default function Home() {
     const { answer, explanation } = cleanResponse(response, prompt);
 
     const passed = testCase.shouldPass
-      ? answer.toLowerCase().includes("yes")
-      : answer.toLowerCase().includes("no");
+      ? answer.toLowerCase().startsWith("yes")
+      : answer.toLowerCase().startsWith("no");
 
     return {
       ...testCase,

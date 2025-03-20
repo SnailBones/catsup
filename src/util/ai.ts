@@ -134,8 +134,8 @@ async function promptAI(
 }
 
 async function promptAIWithCache(
-  model: string = "mistralai/Mistral-7B-Instruct-v0.3",
   inputs: string,
+  model: string = "mistralai/Mistral-7B-Instruct-v0.3",
   temperature: number = TEMPERATURE
 ): Promise<string> {
   const cache = new HuggingFaceCache();
