@@ -124,12 +124,17 @@ export default function Home() {
     sup: string
   ) {
     const prompt = bot.prompt.replaceAll("#s#", sup).replaceAll("#c#", cat);
-    const response = await promptAI(prompt, bot.model);
-    console.log(bot.name + " says:");
-    console.log(response);
-    if (!response) return { answer: null, explanation: null };
-    const { answer, explanation } = extractQuote(response, prompt);
-    return { answer, explanation };
+    try {
+      const response = await promptAI(prompt, bot.model);
+      console.log(bot.name + " says:");
+      console.log(response);
+      const { answer, explanation } = extractQuote(response, prompt);
+      return { answer, explanation };
+    } catch (error) {
+      console.log(bot.name + " could not be reached");
+      console.error(error);
+      return { answer: null, explanation: null };
+    }
   },
   []);
 

@@ -105,9 +105,10 @@ async function promptAI(
   if (!process.env.HUGGING_FACE_API_KEY) {
     throw new Error("Missing Hugging Face API key");
   }
+
   try {
     const response = await fetch(
-      "https://api-inference.huggingface.co/models/" + model,
+      "https://router.huggingface.co/hf-inference/models/" + model,
       {
         method: "POST",
         headers: {
@@ -119,17 +120,18 @@ async function promptAI(
     );
 
     if (!response.ok) {
-      // console.error("API Error:", response);
       console.error("API Error:", response.status, response.statusText);
       // throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    if (!data || !data[0] || !data[0].generated_text) {
+      throw data.error;
+    }
     return data[0].generated_text;
   } catch (error) {
     console.error("Error while fetching text generation:", error);
-    return "Error while fetching text generation: " + error;
-    // throw error;
+    throw error;
   }
 }
 
